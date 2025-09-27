@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "524178263562",
+    "project_id": "ws-notif-app",
+    "storage_bucket": "ws-notif-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:524178263562:android:075351749ee086a449d9f3",
+        "android_client_info": {
+          "package_name": "com.junior.tchimou.npg.NotificationApp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAGFhYTDRGsYr5pvTuJP-oiIz1llhP0dQk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
