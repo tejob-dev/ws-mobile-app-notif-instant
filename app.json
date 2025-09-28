@@ -18,7 +18,8 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.junior.tchimou.npg.NotificationApp"
     },
     "android": {
       "adaptiveIcon": {

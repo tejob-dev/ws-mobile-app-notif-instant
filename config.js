@@ -3,13 +3,15 @@ export const config = {
   // URL du serveur WebSocket (modifiez selon votre serveur)
   // Pour développement local : 'localhost:3001'
   // Pour appareil mobile : '192.168.1.71:3001' (remplacez par votre IP)
-  serverUrl: '192.168.1.71:3001',
+  // Pour production : '69.197.142.189:5022'
+  serverUrl: '69.197.142.189:5022',
   
   // Configuration réseau
   network: {
     // Adresses alternatives à essayer
     fallbackUrls: [
-      '192.168.1.71:3001',
+      '69.197.142.189:5022', // Production
+      '192.168.1.71:3001',   // Développement local
       'localhost:3001',
       '10.0.2.2:3001', // Adresse spéciale pour émulateur Android
     ],
