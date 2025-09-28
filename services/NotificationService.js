@@ -3,6 +3,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import io from 'socket.io-client';
+import config from '../config';
 
 // Configuration des notifications
 Notifications.setNotificationHandler({
@@ -17,10 +18,10 @@ class NotificationService {
   constructor() {
     this.socket = null;
     this.isConnected = false;
-    this.serverUrl = 'http://localhost:3001'; // URL du serveur WebSocket local
+    this.serverUrl = config.serverUrl;
     this.fcmToken = null;
     this.deviceId = null;
-    this.notificationChannelId = 'notification-channel';
+    this.notificationChannelId = config.notifications.channelId;
     
     this.setupNotificationChannel();
   }
@@ -29,8 +30,8 @@ class NotificationService {
   async setupNotificationChannel() {
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync(this.notificationChannelId, {
-        name: 'Notifications en temps réel',
-        description: 'Canal pour les notifications de l\'application',
+        name: config.notifications.channelName,
+        description: config.notifications.channelDescription,
         importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#FF231F7C',
@@ -50,11 +51,21 @@ class NotificationService {
       // Obtenir l'ID de l'appareil
       this.deviceId = await this.getDeviceId();
       
-      // Configurer les notifications Expo
-      await this.setupExpoNotifications();
+      // Configurer les notifications Expo (optionnel)
+      try {
+        await this.setupExpoNotifications();
+      } catch (error) {
+        console.log('⚠️ Les notifications Expo ne sont pas disponibles:', error.message);
+        // Continuer sans les notifications Expo
+      }
       
-      // Se connecter au serveur WebSocket
-      await this.connectToServer();
+      // Se connecter au serveur WebSocket (optionnel)
+      try {
+        await this.connectToServer();
+      } catch (error) {
+        console.log('⚠️ Impossible de se connecter au serveur WebSocket:', error.message);
+        // Continuer sans WebSocket
+      }
       
       // Créer une notification persistante
       await this.createPersistentNotification();
@@ -100,7 +111,7 @@ class NotificationService {
 
       // Obtenir le token Expo
       const token = await Notifications.getExpoPushTokenAsync({
-        projectId: 'ws-notif-app', // Project ID Firebase
+        projectId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', // Project ID Expo valide
       });
       
       this.expoToken = token.data;
@@ -133,46 +144,114 @@ class NotificationService {
   // Se connecter au serveur WebSocket
   async connectToServer() {
     try {
-      this.socket = io(this.serverUrl, {
-        transports: ['websocket'],
-        timeout: 20000,
-        forceNew: true,
-      });
-
-      this.socket.on('connect', () => {
-        console.log('🔗 Connecté au serveur WebSocket');
-        this.isConnected = true;
-        
-        // Enregistrer le token mobile
-        this.registerMobileToken();
-      });
-
-      this.socket.on('disconnect', () => {
-        console.log('❌ Déconnecté du serveur WebSocket');
-        this.isConnected = false;
-        
-        // Tenter de se reconnecter après 5 secondes
-        setTimeout(() => {
-          if (!this.isConnected) {
-            this.connectToServer();
+      // Essayer plusieurs URLs de fallback
+      const urlsToTry = [this.serverUrl, ...config.network.fallbackUrls];
+      
+      for (const url of urlsToTry) {
+        try {
+          console.log('🔗 Tentative de connexion au serveur:', `http://${url}`);
+          
+          this.socket = io(`http://${url}`, {
+            transports: ['websocket', 'polling'],
+            timeout: config.network.connectionTimeout,
+            forceNew: true,
+            reconnection: true,
+            reconnectionDelay: 5000,
+            reconnectionAttempts: 3,
+            upgrade: true,
+            rememberUpgrade: false
+          });
+          
+          // Attendre un peu pour voir si la connexion réussit
+          await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              reject(new Error('Timeout de connexion'));
+            }, config.network.connectionTimeout);
+            
+            this.socket.on('connect', () => {
+              clearTimeout(timeout);
+              resolve();
+            });
+            
+            this.socket.on('connect_error', (error) => {
+              clearTimeout(timeout);
+              reject(error);
+            });
+          });
+          
+          console.log('✅ Connexion réussie à:', url);
+          break; // Sortir de la boucle si la connexion réussit
+          
+        } catch (error) {
+          console.log(`❌ Échec de connexion à ${url}:`, error.message);
+          if (this.socket) {
+            this.socket.disconnect();
+            this.socket = null;
           }
-        }, 5000);
-      });
+          
+          // Si c'est la dernière URL, relancer l'erreur
+          if (url === urlsToTry[urlsToTry.length - 1]) {
+            throw new Error('Impossible de se connecter à aucun serveur');
+          }
+        }
+      }
 
-      this.socket.on('message', (message) => {
-        console.log('📨 Message reçu via WebSocket:', message);
-        this.handleWebSocketMessage(message);
-      });
-
-      this.socket.on('connect_error', (error) => {
-        console.error('❌ Erreur de connexion WebSocket:', error);
-        this.isConnected = false;
-      });
+      // Configurer les gestionnaires d'événements
+      this.setupSocketEventHandlers();
 
     } catch (error) {
       console.error('Erreur lors de la connexion WebSocket:', error);
-      throw error;
+      this.isConnected = false;
+      // Ne pas lancer l'erreur pour éviter de planter l'application
+      // throw error;
     }
+  }
+
+  // Configurer les gestionnaires d'événements WebSocket
+  setupSocketEventHandlers() {
+    if (!this.socket) return;
+
+    this.socket.on('connect', () => {
+      console.log('🔗 Connecté au serveur WebSocket');
+      this.isConnected = true;
+      
+      // Enregistrer le token mobile
+      this.registerMobileToken();
+    });
+
+    this.socket.on('disconnect', () => {
+      console.log('❌ Déconnecté du serveur WebSocket');
+      this.isConnected = false;
+      
+      // Tenter de se reconnecter après 5 secondes
+      setTimeout(() => {
+        if (!this.isConnected) {
+          this.connectToServer().catch(err => {
+            console.log('⚠️ Échec de la reconnexion automatique:', err.message);
+          });
+        }
+      }, 5000);
+    });
+
+    this.socket.on('message', (message) => {
+      console.log('📨 Message reçu via WebSocket:', message);
+      this.handleWebSocketMessage(message);
+    });
+
+    this.socket.on('connect_error', (error) => {
+      console.error('❌ Erreur de connexion WebSocket:', error);
+      this.isConnected = false;
+      
+      // Tenter de se reconnecter après un délai
+      setTimeout(() => {
+        if (!this.isConnected) {
+          console.log('🔄 Reconnexion automatique...');
+          this.connectToServer().catch(err => {
+            console.log('⚠️ Échec de la reconnexion automatique:', err.message);
+          });
+        }
+      }, 10000); // 10 secondes
+    });
   }
 
   // Enregistrer le token mobile sur le serveur

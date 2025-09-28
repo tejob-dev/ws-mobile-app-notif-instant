@@ -3,6 +3,11 @@
     "name": "NotificationApp",
     "slug": "NotificationApp",
     "version": "1.0.0",
+    "extra": {
+      "eas": {
+        "projectId": "9da6b617-6155-4b43-b7f0-b7bed00aee4e"
+      }
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -20,11 +25,13 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "usesCleartextTraffic": true,
       "edgeToEdgeEnabled": true,
       "package": "com.junior.tchimou.npg.NotificationApp",
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.ACCESS_WIFI_STATE",
         "android.permission.WAKE_LOCK",
         "android.permission.VIBRATE",
         "android.permission.RECEIVE_BOOT_COMPLETED",
@@ -56,6 +63,7 @@
           }
         }
       ]
-    ]
+    ],
+    "owner": "junior.tchimou.npg"
   }
 }

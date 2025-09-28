@@ -2,6 +2,7 @@ import * as TaskManager from 'expo-task-manager';
 import * as BackgroundFetch from 'expo-background-fetch';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import notificationService from './NotificationService';
+import config from '../config';
 
 // Nom de la tâche en arrière-plan
 const BACKGROUND_FETCH_TASK = 'background-notification-task';
@@ -48,17 +49,22 @@ class BackgroundService {
       }
 
       // Vérifier si les tâches en arrière-plan sont disponibles
-      const isAvailable = await BackgroundFetch.isAvailableAsync();
-      if (!isAvailable) {
-        console.log('❌ Les tâches en arrière-plan ne sont pas disponibles sur cet appareil');
-        return false;
+      try {
+        const isAvailable = await BackgroundFetch.isAvailableAsync();
+        if (!isAvailable) {
+          console.log('❌ Les tâches en arrière-plan ne sont pas disponibles sur cet appareil');
+          return false;
+        }
+      } catch (error) {
+        console.log('⚠️ Impossible de vérifier la disponibilité des tâches en arrière-plan:', error.message);
+        // Continuer quand même pour les appareils qui supportent les tâches en arrière-plan
       }
 
       // Enregistrer la tâche
       await BackgroundFetch.registerTaskAsync(BACKGROUND_FETCH_TASK, {
-        minimumInterval: 15000, // 15 secondes minimum
-        stopOnTerminate: false, // Continuer même si l'app est fermée
-        startOnBoot: true, // Démarrer au boot de l'appareil
+        minimumInterval: config.backgroundTasks.minimumInterval,
+        stopOnTerminate: config.backgroundTasks.stopOnTerminate,
+        startOnBoot: config.backgroundTasks.startOnBoot,
       });
 
       this.isRegistered = true;

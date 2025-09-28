@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test WebSocket Mobile</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        .message {
+            background-color: #e9ecef;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 Test WebSocket Mobile</h1>
+        
+        <div class="info">
+            <strong>Instructions :</strong><br>
+            1. Assurez-vous que votre téléphone est sur le même réseau WiFi que votre ordinateur<br>
+            2. Cliquez sur "Se connecter"<br>
+            3. Si ça marche, vous verrez "Connecté" en vert<br>
+            4. Testez l'envoi de messages
+        </div>
+
+        <div id="status" class="status disconnected">
+            ❌ Déconnecté
+        </div>
+
+        <div>
+            <button id="connectBtn" onclick="connect()">Se connecter</button>
+            <button id="disconnectBtn" onclick="disconnect()" disabled>Se déconnecter</button>
+        </div>
+
+        <div>
+            <input type="text" id="messageInput" placeholder="Tapez votre message ici..." disabled>
+            <button id="sendBtn" onclick="sendMessage()" disabled>Envoyer</button>
+        </div>
+
+        <h3>📨 Messages reçus :</h3>
+        <div id="messages"></div>
+
+        <h3>📊 Informations de connexion :</h3>
+        <div id="connectionInfo">
+            <p><strong>URL du serveur :</strong> <span id="serverUrl">192.168.1.71:3001</span></p>
+            <p><strong>Socket ID :</strong> <span id="socketId">-</span></p>
+            <p><strong>Transport :</strong> <span id="transport">-</span></p>
+        </div>
+    </div>
+
+    <script>
+        let socket = null;
+        const serverUrl = '192.168.1.71:3001'; // Changez cette IP si nécessaire
+        
+        function updateStatus(connected, message) {
+            const statusEl = document.getElementById('status');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            const messageInput = document.getElementById('messageInput');
+            const sendBtn = document.getElementById('sendBtn');
+            
+            if (connected) {
+                statusEl.className = 'status connected';
+                statusEl.textContent = '✅ ' + message;
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                messageInput.disabled = false;
+                sendBtn.disabled = false;
+            } else {
+                statusEl.className = 'status disconnected';
+                statusEl.textContent = '❌ ' + message;
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                messageInput.disabled = true;
+                sendBtn.disabled = true;
+            }
+        }
+        
+        function addMessage(content, type = 'info') {
+            const messagesEl = document.getElementById('messages');
+            const messageEl = document.createElement('div');
+            messageEl.className = 'message';
+            messageEl.innerHTML = `
+                <strong>[${new Date().toLocaleTimeString()}]</strong> 
+                <span style="color: ${type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : '#007bff'}">${content}</span>
+            `;
+            messagesEl.insertBefore(messageEl, messagesEl.firstChild);
+        }
+        
+        function connect() {
+            if (socket) {
+                socket.disconnect();
+            }
+            
+            addMessage('Tentative de connexion...', 'info');
+            
+            socket = io(`http://${serverUrl}`, {
+                transports: ['websocket', 'polling'],
+                timeout: 10000,
+                forceNew: true
+            });
+            
+            socket.on('connect', () => {
+                updateStatus(true, 'Connecté au serveur');
+                addMessage('Connexion réussie !', 'success');
+                
+                // Mettre à jour les infos de connexion
+                document.getElementById('socketId').textContent = socket.id;
+                document.getElementById('transport').textContent = socket.io.engine.transport.name;
+            });
+            
+            socket.on('disconnect', (reason) => {
+                updateStatus(false, 'Déconnecté : ' + reason);
+                addMessage('Déconnecté : ' + reason, 'error');
+            });
+            
+            socket.on('connect_error', (error) => {
+                updateStatus(false, 'Erreur de connexion : ' + error.message);
+                addMessage('Erreur de connexion : ' + error.message, 'error');
+            });
+            
+            socket.on('message', (data) => {
+                addMessage(`Message reçu : ${data.content}`, 'success');
+            });
+        }
+        
+        function disconnect() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+        }
+        
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message || !socket) return;
+            
+            // Envoyer via l'API REST
+            fetch(`http://${serverUrl}/api/send-message`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    content: message,
+                    type: 'info'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                addMessage(`Message envoyé : ${message}`, 'success');
+                input.value = '';
+            })
+            .catch(error => {
+                addMessage(`Erreur envoi : ${error.message}`, 'error');
+            });
+        }
+        
+        // Auto-connexion au chargement de la page
+        window.addEventListener('load', () => {
+            addMessage('Page chargée. Cliquez sur "Se connecter" pour tester.', 'info');
+        });
+    </script>
+</body>
+</html>
